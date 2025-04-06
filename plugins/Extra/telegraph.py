@@ -1,53 +1,59 @@
-# Don't Remove Credit @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot @Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
-
 import os
 import requests
-import asyncio
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-def upload_image_requests(image_path):
-    upload_url = "https://envs.sh"
+CATBOX_API = "https://catbox.moe/user/api.php"
+
+@Client.on_message(filters.command(["img", "cup", "catbox"], prefixes="/") & filters.reply)
+async def c_upload(client, message: Message):
+    reply = message.reply_to_message
+    user_mention = f"[{message.from_user.first_name}](tg://user?id={message.from_user.id})"
+
+    if not reply.media:
+        return await message.reply_text("Reply to an image, video, or audio file (max 200MB) to upload to Catbox.")
+
+    if reply.document and reply.document.file_size > 200 * 1024 * 1024:
+        return await message.reply_text("File size limit is 200MB for Catbox.")
+
+    msg = await message.reply_text("Uploading your masterpiece... 🎨✨")
 
     try:
-        with open(image_path, 'rb') as file:
-            files = {'file': file} 
-            response = requests.post(upload_url, files=files)
+        downloaded_media = await reply.download()
 
-            if response.status_code == 200:
-                return response.text.strip() 
+        if not downloaded_media:
+            return await msg.edit_text("Oops! Something went wrong during the download. Try again.")
+
+        with open(downloaded_media, "rb") as f:
+            response = requests.post(CATBOX_API, data={"reqtype": "fileupload"}, files={"fileToUpload": f})
+
+        if response.status_code == 200:
+            file_url = response.text.strip()
+
+            # Create share button
+            buttons = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🔗 Share This", url=file_url)]]
+            )
+
+            # Unique caption with user mention
+            caption_text = (
+                f"🎉 **Great news, {user_mention}!** Your file is now floating in the cloud! ☁️🚀\n\n"
+                f"🔗 **Access it here:** [Click to View]({file_url})\n"
+                f"💡 **Tip:** Share it before it gets lost in the digital universe!"
+            )
+
+            # Send instant preview for images & videos
+            if reply.photo:
+                await message.reply_photo(photo=file_url, caption=caption_text, reply_markup=buttons)
+            elif reply.video:
+                await message.reply_video(video=file_url, caption=caption_text, reply_markup=buttons)
             else:
-                return print(f"Upload failed with status code {response.status_code}")
+                await msg.edit_text(caption_text, reply_markup=buttons)
+
+        else:
+            await msg.edit_text("Upload failed. Maybe try again? 🤔")
+
+        os.remove(downloaded_media)
 
     except Exception as e:
-        print(f"Error during upload: {e}")
-        return None
-
-@Client.on_message(filters.command("telegraph") & filters.private)
-async def telegraph_upload(bot, update):
-    t_msg = await bot.ask(chat_id = update.from_user.id, text = "Now Send Me Your Photo Or Video Under 5MB To Get Media Link.")
-    if not t_msg.media:
-        return await update.reply_text("**Only Media Supported.**")
-    path = await t_msg.download()
-    uploading_message = await update.reply_text("<b>ᴜᴘʟᴏᴀᴅɪɴɢ...</b>")
-    try:
-        image_url = upload_image_requests(path)
-        if not image_url:
-            return await uploading_message.edit_text("**Failed to upload file.**")
-    except Exception as error:
-        await uploading_message.edit_text(f"**Upload failed: {error}**")
-        return
-    await uploading_message.edit_text(
-        text=f"<b>Link :-</b>\n\n<code>{image_url}</code>",
-        disable_web_page_preview=True,
-        reply_markup=InlineKeyboardMarkup( [[
-            InlineKeyboardButton(text="Open Link", url=image_url),
-            InlineKeyboardButton(text="Share Link", url=f"https://telegram.me/share/url?url={image_url}")
-            ],[
-            InlineKeyboardButton(text="✗ Close ✗", callback_data="close")
-            ]])
-        )
-    
+        await msg.edit_text(f"Uh-oh! Something went wrong: `{str(e)}`")
