@@ -12,7 +12,7 @@ from pyrogram import Client, filters
 
 @Client.on_message(filters.command('repo'))
 async def git(bot, message):
-    pablo = await message.reply_text("`Processing...`")
+    pablo = await message.reply_text("`ledhu mingey`")
     args = message.text.split(None, 1)[1]
     if len(message.command) == 1:
         await pablo.edit("No input found")
